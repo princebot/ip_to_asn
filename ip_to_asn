@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Name:     ip_to_asn
+# Author:   prince@princebot.com
+# Source:   https://github.com/princebot/ip_to_asn
+# Synopsis: Resolve IPs to ASNs and display total IPs per ASN.
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Constants and shell options.
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+declare -r USAGE='
+usage: ip_to_asn FILE
+Resolve IPs to their ASNs and display total IPs per ASN.
+
+REQUIREMENTS:
+  - GNU netcat
+  - Python 3.x
+
+ARGUMENTS:
+This sends FILE as a bulk query to Team Cymru’s WHOIS database. (See the
+documentation at http://www.team-cymru.org/IP-ASN-mapping.html#whois for
+file-format details.)
+
+Example file:
+
+begin
+verbose
+8.8.8.8
+68.22.187.5
+end
+
+SOURCE:
+https://github.com/princebot/ip_to_asn
+'
+
+declare -r PYTHON_SCRIPT='
+"""Calculate total IPs per ASN from piped-in whois data."""
+
+import sys
+
+asn_map = {}
+for line in sys.stdin:
+    # Forward everything we read from stdin to stdout as we go.
+    print(line, end="")
+
+    # Parse each line that is not an error or a comment and add it to asn_map.
+    # line format: "asn | ip | cidr | country | registry | info | as_name"
+    entry = line.strip().split("|")
+    if len(entry) < 7:
+        continue
+    asn, name = entry[0].strip(), entry[-1].strip()
+    if asn in asn_map:
+        asn_map[asn]["count"] += 1
+    else:
+        asn_map[asn] = dict(count=1, name=name)
+
+div = "#" + (" -" * 39)
+title = "# Total IPs per ASN:\n<Count> | <AS> | <AS Name>"
+print("\n\n{div}\n{title}\n{div}".format(div=div, title=title))
+
+# Sort and display asn_map.
+for k in sorted(asn_map, reverse=True, key=lambda k: asn_map[k]["count"]):
+    print("{} | {} | {}".format(asn_map[k]["count"], k, asn_map[k]["name"]))
+'
+
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Functions.
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+function main {
+    local argc=$#
+    if ((argc < 1)) || [[ $1 =~ ^--?(h(elp)?)$ ]]; then
+        echo "${USAGE}"
+        exit 0
+    elif ((argc > 1)); then
+        >&2 echo "too many arguments"
+        >&2 echo "${USAGE}"
+        exit 1
+    fi
+
+    local infile=$1
+    check_file "${infile}"
+    netcat whois.cymru.com 43 < "${infile}" \
+        | sort -n \
+        | python -c "${PYTHON_SCRIPT}"
+}
+
+# Terminate program if query file is not in a correct format.
+#
+# Arguments: $1 => file
+function check_file {
+    local infile=$1
+    if [[ ! -f ${infile} ]]; then
+        die "infile '${infile}' not found"
+    fi
+
+    local err="file format error"
+    local -i begin_keyword=$(grep -Ec '^begin$' ${infile})
+    local -i end_keyword=$(grep -Ec '^end$' ${infile})
+
+    if ((begin_keyword == 0)); then
+        die "${err}: missing begin keyword"
+    elif ((begin_keyword > 1 )); then
+        die "${err}: multiple begin keywords"
+    elif ((end_keyword == 0)); then
+        die "${err}: missing end keyword"
+    elif ((end_keyword > 1)); then
+        die "${err}: multiple end keywords"
+    fi
+}
+
+# Terminate program with an error message.
+#
+# Arguments: $@
+function die {
+    >&2 printf -- "$@\n"
+    exit 1
+}
+
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Start the script.
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+main "$@"
