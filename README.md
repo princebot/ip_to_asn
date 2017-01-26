@@ -37,5 +37,8 @@ TODO
 * Try out [bats](https://github.com/sstephenson/bats) for unit testing.
 * Sort results by IP address after initial sort by ASN.
 * Test with large list (50K+) of IPs for input.
-* Check time/effort cost of implementing this as a `pip`-installable Python
+* Add (more easily) machine-parsable output.
+* Check time effort/cost of implementing this as a `pip`-installable Python
   program instead (less black magic, simpler to install and test).
+* … But don’t get carried away, because you have other stuff to do.
+  :stuck_out_tongue:
