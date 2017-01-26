@@ -61,12 +61,13 @@ for line in sys.stdin:
         asn_map[asn] = dict(count=1, name=name)
 
 div = "#" + (" -" * 39)
-title = "# Total IPs per ASN:\n<Count> | <AS> | <AS Name>"
+title = "# Total IPs per ASN:\n# ASN   | COUNT | AS_NAME"
 print("\n\n{div}\n{title}\n{div}".format(div=div, title=title))
 
 # Sort and display asn_map.
+s = "{:<7} | {:>5} | {}"
 for k in sorted(asn_map, reverse=True, key=lambda k: asn_map[k]["count"]):
-    print("{} | {} | {}".format(asn_map[k]["count"], k, asn_map[k]["name"]))
+    print(s.format(k, asn_map[k]["count"], asn_map[k]["name"]))
 '
 
 
